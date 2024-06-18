@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CrossFit Jungle Records</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>CrossFit Jungle Records</h1>
+        </header>
+        <main id="mainContainer">
+            <!-- Rankings populated by JavaScript -->
+        </main>
+        <form id="recordForm">
+            <input type="text" id="username" name="username" placeholder="Username" required>
+            <select id="category" name="category" required>
+                <!-- Categories populated by JavaScript -->
+            </select>
+            <select id="exercise" name="exercise" required>
+                <!-- Exercises populated by JavaScript -->
+            </select>
+            <select id="recordType" name="recordType" required>
+                <option value="time">Time (s)</option>
+                <option value="weight">Weight (kg)</option>
+                <option value="reps">Reps</option>
+            </select>
+            <input type="number" id="record" name="record" placeholder="Record" required>
+            <button type="submit">Submit</button>
+        </form>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
