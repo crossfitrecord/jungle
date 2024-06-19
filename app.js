@@ -33,140 +33,155 @@ const categories = {
     ]
 };
 
+let records = JSON.parse(localStorage.getItem('records')) || [];
+let selectedExercise = null;
+
 const categorySelect = document.getElementById('category');
 const exerciseSelect = document.getElementById('exercise');
-const mainContainer = document.getElementById('mainContainer');
-
-let records = JSON.parse(localStorage.getItem('records')) || [];
-let currentIndex = {};
+const recordTypeInputs = document.getElementById('recordTypeInputs');
+const exerciseList = document.getElementById('exerciseList');
+const recordDisplay = document.getElementById('recordDisplay');
+const currentExerciseTitle = document.getElementById('exerciseTitle');
+const firstPlaceName = document.getElementById('firstPlaceName');
+const secondPlaceName = document.getElementById('secondPlaceName');
+const thirdPlaceName = document.getElementById('thirdPlaceName');
+const firstPlaceImg = document.getElementById('firstPlaceImg');
+const secondPlaceImg = document.getElementById('secondPlaceImg');
+const thirdPlaceImg = document.getElementById('thirdPlaceImg');
 
 // Populate categories
 function populateCategories() {
-    for (const category in categories) {
+    categorySelect.innerHTML = '';
+    Object.keys(categories).forEach(category => {
         const option = document.createElement('option');
         option.value = category;
         option.textContent = category;
         categorySelect.appendChild(option);
-    }
+    });
 }
 
 // Populate exercises
 function populateExercises() {
     const selectedCategory = categorySelect.value;
     exerciseSelect.innerHTML = '';
-    if (categories[selectedCategory]) {
-        categories[selectedCategory].forEach(exercise => {
-            const option = document.createElement('option');
-            option.value = exercise;
-            option.textContent = exercise;
-            exerciseSelect.appendChild(option);
-        });
+    categories[selectedCategory].forEach(exercise => {
+        const option = document.createElement('option');
+        option.value = exercise;
+        option.textContent = exercise;
+        exerciseSelect.appendChild(option);
+    });
+    updateRecordTypeInputs();
+}
+
+function updateRecordTypeInputs() {
+    const selectedCategory = categorySelect.value;
+    let inputFields = '';
+
+    if (["POWER LIFTS", "OLYMPIC LIFTS"].includes(selectedCategory)) {
+        inputFields = `
+            <input type="number" id="record" name="record" placeholder="Record (LBS)" required>
+            <input type="hidden" id="recordType" value="weight">
+        `;
+    } else if (selectedCategory === "GYMNASTIC MAXES") {
+        inputFields = `
+            <input type="number" id="record" name="record" placeholder="Record (Reps)" required>
+            <input type="hidden" id="recordType" value="reps">
+        `;
+    } else {
+        inputFields = `
+            <input type="number" id="minutes" name="minutes" placeholder="Minutes" min="0" required>
+            <input type="number" id="seconds" name="seconds" placeholder="Seconds" min="0" max="59" required>
+            <input type="hidden" id="recordType" value="time">
+        `;
     }
+    recordTypeInputs.innerHTML = inputFields;
+}
+
+// Populate exercise list
+function populateExerciseList() {
+    exerciseList.innerHTML = '';
+    for (const category in categories) {
+        const categoryDiv = document.createElement('div');
+        categoryDiv.classList.add('category');
+
+        const categoryHeader = document.createElement('h3');
+        categoryHeader.textContent = category;
+        categoryDiv.appendChild(categoryHeader);
+
+        const exerciseUl = document.createElement('ul');
+        categories[category].forEach(exercise => {
+            const exerciseLi = document.createElement('li');
+            exerciseLi.textContent = exercise;
+            exerciseLi.addEventListener('click', () => {
+                selectedExercise = exercise;
+                displayRecords(exercise);
+            });
+            exerciseUl.appendChild(exerciseLi);
+        });
+
+        categoryDiv.appendChild(exerciseUl);
+        exerciseList.appendChild(categoryDiv);
+    }
+}
+
+// Display records for the selected exercise
+function displayRecords(exercise) {
+    recordDisplay.innerHTML = '';
+    currentExerciseTitle.textContent = exercise;
+
+    const exerciseRecords = records.filter(record => record.exercise === exercise);
+    const sortedRecords = exerciseRecords.sort((a, b) => {
+        if (a.recordType === 'weight') return b.recordValue - a.recordValue;
+        if (a.recordType === 'reps') return b.recordValue - a.recordValue;
+        return a.recordValue - b.recordValue;
+    });
+
+    if (sortedRecords.length > 0) {
+        const [first, second, third] = sortedRecords;
+        firstPlaceName.textContent = first ? first.username : '-';
+        secondPlaceName.textContent = second ? second.username : '-';
+        thirdPlaceName.textContent = third ? third.username : '-';
+    }
+
+    sortedRecords.forEach((record, index) => {
+        const recordElement = document.createElement('div');
+        recordElement.classList.add('record', `rank-${index + 1}`);
+        recordElement.innerHTML = `
+            <span>${index + 1}</span>
+            <span>${record.username}</span>
+            <span>${record.date}</span>
+            <span>${record.recordType === 'time' ? `${Math.floor(record.recordValue / 60)}m ${record.recordValue % 60}s` : record.recordValue} ${record.recordType}</span>
+            <button onclick="promptDeleteRecord(${record.id})">Delete</button>
+        `;
+        recordDisplay.appendChild(recordElement);
+    });
 }
 
 // Handle form submission
 function handleFormSubmit(event) {
     event.preventDefault();
-    const username = document.getElementById('username').value.trim();
+    const username = document.getElementById('username').value;
     const category = categorySelect.value;
     const exercise = exerciseSelect.value;
     const recordType = document.getElementById('recordType').value;
-    const recordValue = parseFloat(document.getElementById('record').value);
-    const date = new Date().toISOString().split('T')[0].replace(/-/g, '.');
 
-    if (!username || !category || !exercise || isNaN(recordValue)) return;
+    let recordValue;
+    if (recordType === 'time') {
+        const minutes = parseInt(document.getElementById('minutes').value, 10);
+        const seconds = parseInt(document.getElementById('seconds').value, 10);
+        recordValue = minutes * 60 + seconds;
+    } else {
+        recordValue = parseFloat(document.getElementById('record').value);
+    }
 
-    records.push({ id: Date.now(), username, date, category, exercise, recordType, recordValue });
+    const date = new Date().toISOString().split('T')[0].replace(/-/g, '.').slice(2);
+    const recordId = Date.now();
+
+    records.push({ id: recordId, username, date, category, exercise, recordType, recordValue });
     localStorage.setItem('records', JSON.stringify(records));
 
-    updateRankings();
+    displayRecords(selectedExercise);
     document.getElementById('recordForm').reset();
-}
-
-// Update rankings
-function updateRankings() {
-    mainContainer.innerHTML = '';
-
-    // Group records by exercise
-    const groupedByExercise = {};
-    records.forEach(record => {
-        if (!groupedByExercise[record.exercise]) {
-            groupedByExercise[record.exercise] = [];
-        }
-        groupedByExercise[record.exercise].push(record);
-    });
-
-    // Create layout for each exercise
-    for (const exercise in groupedByExercise) {
-        const section = document.createElement('section');
-        section.classList.add('exercise');
-
-        const table = document.createElement('table');
-        table.classList.add('ranking-table');
-
-        const thead = document.createElement('thead');
-        thead.innerHTML = `
-            <tr>
-                <th>Rank</th>
-                <th>Username</th>
-                <th>Date</th>
-                <th>Record</th>
-                <th>Type</th>
-                <th>Action</th>
-            </tr>
-        `;
-        table.appendChild(thead);
-
-        const tbody = document.createElement('tbody');
-
-        const sortedRecords = groupedByExercise[exercise].sort((a, b) => {
-            if (a.recordType === 'weight') return b.recordValue - a.recordValue;
-            return a.recordValue - b.recordValue;
-        });
-
-        sortedRecords.forEach((record, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${record.username}</td>
-                <td>${record.date}</td>
-                <td>${record.recordValue}</td>
-                <td>${record.recordType}</td>
-                <td><button onclick="promptDeleteRecord(${record.id})">Delete</button></td>
-            `;
-            tbody.appendChild(row);
-        });
-
-        table.appendChild(tbody);
-
-        const exerciseHeader = document.createElement('h3');
-        exerciseHeader.textContent = exercise;
-        section.appendChild(exerciseHeader);
-        section.appendChild(table);
-
-        mainContainer.appendChild(section);
-
-        currentIndex[exercise] = 0;
-        setInterval(() => rotateRecords(exercise, tbody), 3000);
-    }
-}
-
-// Rotate the records displayed for an exercise
-function rotateRecords(exercise, tbody) {
-    const recordsForExercise = tbody.children;
-    const length = recordsForExercise.length;
-    if (length > 3) {
-        Array.from(recordsForExercise).forEach((record, index) => {
-            record.style.display = 'none';
-        });
-
-        for (let i = currentIndex[exercise]; i < currentIndex[exercise] + 1; i++) {
-            const idx = i % length;
-            recordsForExercise[idx].style.display = '';
-        }
-
-        currentIndex[exercise] = (currentIndex[exercise] + 1) % length;
-    }
 }
 
 // Prompt for password before deleting a record
@@ -183,13 +198,46 @@ function promptDeleteRecord(recordId) {
 function deleteRecord(recordId) {
     records = records.filter(record => record.id !== recordId);
     localStorage.setItem('records', JSON.stringify(records));
-    updateRankings();
+    displayRecords(selectedExercise);
 }
 
+// Image upload handlers
+document.getElementById('firstPlaceFile').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            firstPlaceImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('secondPlaceFile').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            secondPlaceImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('thirdPlaceFile').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            thirdPlaceImg.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
 // Initialize
+document.getElementById('recordForm').addEventListener('submit', handleFormSubmit);
+categorySelect.addEventListener('change', populateExercises);
 populateCategories();
 populateExercises();
-updateRankings();
-
-categorySelect.addEventListener('change', populateExercises);
-document.getElementById('recordForm').addEventListener('submit', handleFormSubmit);
+populateExerciseList();
