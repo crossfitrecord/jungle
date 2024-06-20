@@ -226,6 +226,8 @@ document.getElementById('secondPlaceFile').addEventListener('change', (event) =>
 
 document.getElementById('thirdPlaceFile').addEventListener('change', (event) => {
     const file = event.target.files[0];
+
+
     if (file) {
         const reader = new FileReader();
         reader.onload = (e) => {
